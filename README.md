@@ -24,7 +24,7 @@ A Java-based tool that connects to any RDBMS (PostgreSQL, MySQL, Oracle, SQL Ser
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/db2h2.git
+git clone https://github.com/jaksonlin/db2h2.git
 cd db2h2
 ```
 
@@ -340,9 +340,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/db2h2/issues)
-- **Documentation**: [Wiki](https://github.com/your-username/db2h2/wiki)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/db2h2/discussions)
+- **Issues**: [GitHub Issues](https://github.com/jaksonlin/db2h2/issues)
+- **Documentation**: [Wiki](https://github.com/jaksonlin/db2h2/wiki)
+- **Discussions**: [GitHub Discussions](https://github.com/jaksonlin/db2h2/discussions)
 
 ## Roadmap
 
