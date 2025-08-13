@@ -125,6 +125,40 @@ public class SchemaMigrator {
     }
     
     /**
+     * Validates and logs column metadata for debugging
+     */
+    private void logColumnMetadata(TableMetadata metadata) {
+        logger.info("Processing table: {} with {} columns", metadata.getTableName(), metadata.getColumns().size());
+        
+        for (ColumnMetadata column : metadata.getColumns()) {
+            String mappedType = mapDataType(column.getType(), column.getSize());
+            logger.info("Column: {} - Source Type: {} - Size: {} - Mapped to: {} - Nullable: {}", 
+                       column.getName(), column.getType(), column.getSize(), mappedType, column.isNullable());
+            
+            // Warn about potentially problematic columns
+            if (column.getSize() > 1000000) {
+                logger.warn("Large column detected: {} with size {} - will be converted to CLOB", 
+                           column.getName(), column.getSize());
+            }
+        }
+    }
+    
+    /**
+     * Validates and sanitizes CREATE TABLE SQL for H2 compatibility
+     */
+    private String sanitizeCreateTableSql(String sql) {
+        // Check for any remaining problematic patterns
+        if (sql.contains("VARCHAR(2147483647)")) {
+            logger.error("Found problematic VARCHAR(2147483647) in SQL - this should not happen!");
+            throw new IllegalStateException("VARCHAR precision overflow detected in generated SQL");
+        }
+        
+        // Additional H2-specific validations can be added here
+        logger.debug("SQL validation passed");
+        return sql;
+    }
+    
+    /**
      * Migrates a single table
      */
     private void migrateTable(String tableName) throws SQLException {
@@ -139,8 +173,14 @@ public class SchemaMigrator {
         // Get table metadata from source
         TableMetadata metadata = sourceConnector.getTableMetadata(tableName);
         
+        // Log column metadata for debugging
+        logColumnMetadata(metadata);
+        
         // Generate CREATE TABLE statement
         String createTableSql = generateCreateTableSql(metadata);
+        
+        // Validate and sanitize the SQL
+        createTableSql = sanitizeCreateTableSql(createTableSql);
         
         // Execute CREATE TABLE
         targetConnector.executeUpdate(createTableSql);
@@ -259,8 +299,12 @@ public class SchemaMigrator {
                 sql.append(", ");
             }
             
+            String mappedType = mapDataType(column.getType(), column.getSize());
+            logger.debug("Mapping column {}: {} (size: {}) -> {}", 
+                       column.getName(), column.getType(), column.getSize(), mappedType);
+            
             sql.append(column.getName()).append(" ");
-            sql.append(mapDataType(column.getType(), column.getSize()));
+            sql.append(mappedType);
             
             if (!column.isNullable()) {
                 sql.append(" NOT NULL");
@@ -297,9 +341,30 @@ public class SchemaMigrator {
     }
     
     /**
+     * Determines if a column size represents an unlimited or very large field
+     */
+    public boolean isUnlimitedOrVeryLargeSize(int size) {
+        String dbType = sourceConnector.getDatabaseType();
+        logger.debug("Checking size {} for database type: {}", size, dbType);
+        
+        // Common values used by different databases to represent unlimited text
+        boolean isUnlimited = size <= 0 || 
+               size == 2147483647 ||  // PostgreSQL unlimited VARCHAR/TEXT, MySQL LONGTEXT
+               size == 65535 ||       // MySQL TEXT
+               size == 16777215 ||    // MySQL MEDIUMTEXT
+               size > config.getMigration().getMaxVarcharSizeThreshold(); // Configurable threshold
+        
+        if (isUnlimited) {
+            logger.debug("Column size {} identified as unlimited/very large for database type: {}", size, dbType);
+        }
+        
+        return isUnlimited;
+    }
+    
+    /**
      * Maps data types from source to H2
      */
-    private String mapDataType(String sourceType, int size) {
+    public String mapDataType(String sourceType, int size) {
         String type = sourceType.toUpperCase();
         
         // Check for custom mappings
@@ -316,7 +381,14 @@ public class SchemaMigrator {
             case "CHAR":
             case "TEXT":
             case "STRING":
-                return size > 0 ? "VARCHAR(" + size + ")" : "VARCHAR";
+                // Handle unlimited or very large text fields
+                if (isUnlimitedOrVeryLargeSize(size)) {
+                    // For unlimited text or very large sizes, use CLOB in H2
+                    // This handles various database unlimited size representations
+                    logger.debug("Converting large/unlimited text field (size: {}) to CLOB for type: {}", size, type);
+                    return "CLOB";
+                }
+                return "VARCHAR(" + size + ")";
                 
             case "INT":
             case "INTEGER":

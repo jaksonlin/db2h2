@@ -36,6 +36,7 @@
       "SYSDATE": "CURRENT_TIMESTAMP",
       "GETDATE()": "CURRENT_TIMESTAMP"
     },
+    "maxVarcharSizeThreshold": 1000000,
     "constraints": {
       "preserveForeignKeys": true,
       "preserveIndexes": true,

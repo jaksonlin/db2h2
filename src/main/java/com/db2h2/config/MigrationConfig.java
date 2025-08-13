@@ -81,6 +81,9 @@ public class MigrationConfig {
         @JsonProperty("functionMappings")
         private Map<String, String> functionMappings;
         
+        @JsonProperty("maxVarcharSizeThreshold")
+        private Integer maxVarcharSizeThreshold = 1000000; // Default: 1MB
+        
         @JsonProperty("constraints")
         private ConstraintSettings constraints;
         
@@ -139,6 +142,14 @@ public class MigrationConfig {
         
         public void setFunctionMappings(Map<String, String> functionMappings) {
             this.functionMappings = functionMappings;
+        }
+        
+        public Integer getMaxVarcharSizeThreshold() {
+            return maxVarcharSizeThreshold;
+        }
+        
+        public void setMaxVarcharSizeThreshold(Integer maxVarcharSizeThreshold) {
+            this.maxVarcharSizeThreshold = maxVarcharSizeThreshold;
         }
         
         public ConstraintSettings getConstraints() {

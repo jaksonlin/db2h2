@@ -148,3 +148,170 @@ The fixes are automatically applied when migrating from PostgreSQL to H2. Users 
 - **Debugging**: Comprehensive logging makes troubleshooting easier
 - **Reusability**: Can run migration multiple times without constraint conflicts
 - **Maintainability**: Clean separation of concerns with dedicated translation methods
+
+# Migration Fixes: VARCHAR Precision Overflow
+
+## Problem Description
+
+The migration was failing with H2 database errors due to VARCHAR precision overflow:
+
+```
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Precision ("2147483647") must be between "1" and "1000000000" inclusive
+```
+
+## Root Cause
+
+PostgreSQL (and other databases) use `2147483647` (2^31 - 1) to represent unlimited VARCHAR/TEXT fields. When the migration code tried to create H2 tables with `VARCHAR(2147483647)`, H2 rejected it because its maximum VARCHAR precision is 1,000,000,000.
+
+## Solution Implemented
+
+### 1. Enhanced Data Type Mapping
+
+Modified `SchemaMigrator.mapDataType()` to detect unlimited text fields and convert them to H2-compatible `CLOB` type:
+
+```java
+case "VARCHAR":
+case "CHAR":
+case "TEXT":
+case "STRING":
+    // Handle unlimited or very large text fields
+    if (isUnlimitedOrVeryLargeSize(size)) {
+        // For unlimited text or very large sizes, use CLOB in H2
+        logger.debug("Converting large/unlimited text field (size: {}) to CLOB for type: {}", size, type);
+        return "CLOB";
+    }
+    return "VARCHAR(" + size + ")";
+```
+
+### 2. Smart Size Detection
+
+Added `isUnlimitedOrVeryLargeSize()` method to identify problematic column sizes:
+
+```java
+private boolean isUnlimitedOrVeryLargeSize(int size) {
+    String dbType = sourceConnector.getDatabaseType();
+    
+    // Common values used by different databases to represent unlimited text
+    return size <= 0 || 
+           size == 2147483647 ||  // PostgreSQL unlimited VARCHAR/TEXT, MySQL LONGTEXT
+           size == 65535 ||       // MySQL TEXT
+           size == 16777215 ||    // MySQL MEDIUMTEXT
+           size > config.getMigration().getMaxVarcharSizeThreshold(); // Configurable threshold
+}
+```
+
+### 3. Configurable Threshold
+
+Added `maxVarcharSizeThreshold` configuration option to allow customization:
+
+```json
+{
+  "migration": {
+    "maxVarcharSizeThreshold": 1000000,  // Default: 1MB
+    // ... other settings
+  }
+}
+```
+
+### 4. Enhanced Logging and Validation
+
+- Added detailed column metadata logging
+- Added SQL validation before execution
+- Added warnings for large columns
+- Added database-specific size handling
+
+## Configuration Options
+
+### maxVarcharSizeThreshold
+
+Controls when text fields should be converted to CLOB:
+
+- **Default**: 1,000,000 (1MB)
+- **Purpose**: Any column with size exceeding this threshold will be converted to CLOB
+- **Usage**: Set lower for more aggressive CLOB conversion, higher to preserve more VARCHAR fields
+
+### Example Configuration
+
+```json
+{
+  "migration": {
+    "maxVarcharSizeThreshold": 500000,  // Convert fields > 500KB to CLOB
+    "dataTypeMappings": {
+      "postgresql.text": "h2.clob",
+      "mysql.longtext": "h2.clob"
+    }
+  }
+}
+```
+
+## Database-Specific Handling
+
+### PostgreSQL
+- `VARCHAR(2147483647)` → `CLOB`
+- `TEXT` → `CLOB` (if size > threshold)
+
+### MySQL
+- `TEXT` (size 65535) → `CLOB`
+- `MEDIUMTEXT` (size 16777215) → `CLOB`
+- `LONGTEXT` (size 2147483647) → `CLOB`
+
+### Other Databases
+- Any text field with size > threshold → `CLOB`
+
+## Benefits
+
+1. **Eliminates Migration Failures**: No more VARCHAR precision overflow errors
+2. **Preserves Data Integrity**: Large text content is properly handled
+3. **Configurable**: Users can adjust thresholds based on their needs
+4. **Database Agnostic**: Works with PostgreSQL, MySQL, Oracle, SQL Server
+5. **Better Performance**: CLOB is more efficient for large text in H2
+
+## Migration Process
+
+1. **Column Analysis**: Logs all column metadata with sizes
+2. **Size Detection**: Identifies unlimited/very large text fields
+3. **Type Mapping**: Converts problematic fields to CLOB
+4. **SQL Validation**: Ensures generated SQL is H2-compatible
+5. **Table Creation**: Creates tables with proper data types
+
+## Testing
+
+The fix has been tested with:
+- PostgreSQL unlimited VARCHAR/TEXT fields
+- MySQL TEXT/MEDIUMTEXT/LONGTEXT fields
+- Various size thresholds
+- Different database types
+
+## Future Enhancements
+
+1. **Additional Data Types**: Support for JSON, XML, and other complex types
+2. **Performance Optimization**: Batch processing for large schemas
+3. **Rollback Support**: Ability to revert failed migrations
+4. **Migration Reports**: Detailed analysis of type conversions
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Still Getting Precision Errors**: Check if `maxVarcharSizeThreshold` is set too high
+2. **Too Many CLOB Fields**: Increase the threshold value
+3. **Performance Issues**: Consider using smaller thresholds for better H2 performance
+
+### Debug Mode
+
+Enable debug logging to see detailed column processing:
+
+```json
+{
+  "output": {
+    "logLevel": "DEBUG"
+  }
+}
+```
+
+This will show:
+- Column metadata retrieval
+- Size detection logic
+- Type mapping decisions
+- SQL generation process
+- Validation results

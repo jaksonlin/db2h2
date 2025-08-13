@@ -35,6 +35,7 @@
         "true": "true",
         "false": "false"
       },
+      "maxVarcharSizeThreshold": 1000000,
       "constraints": {
         "preserveForeignKeys": true,
         "preserveIndexes": true,

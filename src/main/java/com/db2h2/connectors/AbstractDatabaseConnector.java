@@ -110,12 +110,21 @@ public abstract class AbstractDatabaseConnector implements DatabaseConnector {
         try (ResultSet rs = metaData.getColumns(config.getDatabase(), null, tableName, "%")) {
             while (rs.next()) {
                 ColumnMetadata column = new ColumnMetadata();
-                column.setName(rs.getString("COLUMN_NAME"));
-                column.setType(rs.getString("TYPE_NAME"));
-                column.setSize(rs.getInt("COLUMN_SIZE"));
+                String columnName = rs.getString("COLUMN_NAME");
+                String columnType = rs.getString("TYPE_NAME");
+                int columnSize = rs.getInt("COLUMN_SIZE");
+                
+                column.setName(columnName);
+                column.setType(columnType);
+                column.setSize(columnSize);
                 column.setNullable(rs.getInt("NULLABLE") == DatabaseMetaData.columnNullable);
                 column.setDefaultValue(rs.getString("COLUMN_DEF"));
                 column.setAutoIncrement("YES".equals(rs.getString("IS_AUTOINCREMENT")));
+                
+                // Log column metadata for debugging
+                logger.debug("Column: {} - Type: {} - Size: {} - Nullable: {} - Default: {}", 
+                           columnName, columnType, columnSize, column.isNullable(), column.getDefaultValue());
+                
                 columns.add(column);
             }
         }
