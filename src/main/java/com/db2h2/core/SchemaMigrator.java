@@ -194,22 +194,18 @@ public class SchemaMigrator {
     /**
      * Checks if a table already exists
      */
-    private boolean tableExists(String tableName) {
-        try {
-            String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?";
-            try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
-                pstmt.setString(1, tableName.toUpperCase());
-                try (java.sql.ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt(1) > 0;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            logger.debug("Could not check if table exists: {}", e.getMessage());
-        }
-        return false;
-    }
+	private boolean tableExists(String tableName) {
+		try {
+			// Use JDBC metadata for portability across databases
+			java.sql.DatabaseMetaData md = targetConnector.getConnection().getMetaData();
+			try (java.sql.ResultSet rs = md.getTables(null, null, tableName.toUpperCase(), new String[] { "TABLE" })) {
+				return rs.next();
+			}
+		} catch (Exception e) {
+			logger.debug("Could not check if table exists: {}", e.getMessage());
+		}
+		return false;
+	}
     
     /**
      * Drops a table if it exists
@@ -445,11 +441,20 @@ public class SchemaMigrator {
      * Creates indexes for a table
      */
     private void createIndexes(TableMetadata metadata) throws SQLException {
+        logger.info("Creating indexes for table: {}", metadata.getTableName());
+        
         for (IndexMetadata index : metadata.getIndexes()) {
             try {
                 // Check if index already exists
-                if (indexExists(metadata.getTableName(), index.getName())) {
+                if (indexExists(metadata.getTableName().toUpperCase(), index.getName().toUpperCase())) {
                     logger.debug("Index {} already exists on table {}, skipping", index.getName(), metadata.getTableName());
+                    continue;
+                }
+                
+                // Check if the column type supports indexing in H2
+                if (!isIndexableColumnType(metadata.getTableName(), index.getColumnName())) {
+                    logger.warn("Skipping index {} on column {} - column type not supported for indexing in H2", 
+                               index.getName(), index.getColumnName());
                     continue;
                 }
                 
@@ -461,6 +466,30 @@ public class SchemaMigrator {
                            index.getName(), metadata.getTableName(), e.getMessage());
             }
         }
+    }
+    
+    /**
+     * Checks if a column type supports indexing in H2
+     */
+    private boolean isIndexableColumnType(String tableName, String columnName) {
+        try {
+            // Get column metadata to check the type
+            TableMetadata tableMetadata = sourceConnector.getTableMetadata(tableName);
+            for (ColumnMetadata column : tableMetadata.getColumns()) {
+                if (column.getName().equalsIgnoreCase(columnName)) {
+                    String columnType = column.getType().toUpperCase();
+                    // H2 doesn't support indexes on CLOB, BLOB, and some other types
+                    return !columnType.contains("CLOB") && 
+                           !columnType.contains("BLOB") && 
+                           !columnType.contains("LONG") &&
+                           !columnType.contains("TEXT");
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not determine column type for {} in table {}: {}", columnName, tableName, e.getMessage());
+        }
+        // Default to true if we can't determine the type
+        return true;
     }
     
     /**
@@ -536,16 +565,19 @@ public class SchemaMigrator {
      */
     private boolean foreignKeyExists(String tableName, String constraintName) {
         try {
-            String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.CONSTRAINTS WHERE TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
-            try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
-                pstmt.setString(1, tableName.toUpperCase());
-                pstmt.setString(2, constraintName.toUpperCase());
-                try (java.sql.ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt(1) > 0;
+           
+                // For other databases, use standard information schema
+                String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.CONSTRAINTS WHERE TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
+                try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
+                    pstmt.setString(1, tableName.toUpperCase());
+                    pstmt.setString(2, constraintName.toUpperCase());
+                    try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next()) {
+                            return rs.getInt(1) > 0;
+                        }
                     }
                 }
-            }
+            
         } catch (Exception e) {
             logger.debug("Could not check if foreign key exists: {}", e.getMessage());
         }
