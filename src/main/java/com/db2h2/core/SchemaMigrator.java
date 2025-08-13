@@ -565,18 +565,17 @@ public class SchemaMigrator {
      */
     private boolean foreignKeyExists(String tableName, String constraintName) {
         try {
-           
-                // For other databases, use standard information schema
-                String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.CONSTRAINTS WHERE TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
-                try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
-                    pstmt.setString(1, tableName.toUpperCase());
-                    pstmt.setString(2, constraintName.toUpperCase());
-                    try (java.sql.ResultSet rs = pstmt.executeQuery()) {
-                        if (rs.next()) {
-                            return rs.getInt(1) > 0;
-                        }
+            // For H2, use the CONSTRAINTS table which contains table information
+            String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS   WHERE TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
+            try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
+                pstmt.setString(1, tableName.toUpperCase());
+                pstmt.setString(2, constraintName.toUpperCase());
+                try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
                     }
                 }
+            }
             
         } catch (Exception e) {
             logger.debug("Could not check if foreign key exists: {}", e.getMessage());
