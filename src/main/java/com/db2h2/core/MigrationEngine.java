@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 /**
  * Main migration engine that orchestrates the migration process
@@ -137,19 +138,19 @@ public class MigrationEngine {
                 // Include all tables except excluded ones
                 return allTables.stream()
                     .filter(tableName -> !isExcluded(tableName, excludeTables))
-                    .toList();
+                    .collect(Collectors.toList());
             } else {
                 // Include only specified tables
                 return tables.stream()
                     .filter(allTables::contains)
                     .filter(tableName -> !isExcluded(tableName, excludeTables))
-                    .toList();
+                    .collect(Collectors.toList());
             }
         } else {
             // Include all tables except excluded ones
             return allTables.stream()
                 .filter(tableName -> !isExcluded(tableName, excludeTables))
-                .toList();
+                .collect(Collectors.toList());
         }
     }
     

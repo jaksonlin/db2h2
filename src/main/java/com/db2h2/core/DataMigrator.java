@@ -359,6 +359,6 @@ public class DataMigrator {
     private Connection getTargetConnection() throws SQLException {
         // This is a simplified approach - in a real implementation, you might want to use a connection pool
         return targetConnector.isConnected() ? 
-            ((com.db2h2.connectors.AbstractDatabaseConnector) targetConnector).connection : null;
+            ((com.db2h2.connectors.AbstractDatabaseConnector) targetConnector).getConnection() : null;
     }
 } 
