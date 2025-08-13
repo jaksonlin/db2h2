@@ -78,6 +78,9 @@ public class MigrationConfig {
         @JsonProperty("dataTypeMappings")
         private Map<String, String> dataTypeMappings;
         
+        @JsonProperty("functionMappings")
+        private Map<String, String> functionMappings;
+        
         @JsonProperty("constraints")
         private ConstraintSettings constraints;
         
@@ -128,6 +131,14 @@ public class MigrationConfig {
         
         public void setDataTypeMappings(Map<String, String> dataTypeMappings) {
             this.dataTypeMappings = dataTypeMappings;
+        }
+        
+        public Map<String, String> getFunctionMappings() {
+            return functionMappings;
+        }
+        
+        public void setFunctionMappings(Map<String, String> functionMappings) {
+            this.functionMappings = functionMappings;
         }
         
         public ConstraintSettings getConstraints() {

@@ -1,0 +1,64 @@
+{
+    "source": {
+      "type": "postgresql",
+      "host": "localhost",
+      "port": 5432,
+      "database": "testcraft_test",
+      "username": "postgres",
+      "password": "postgres",
+      "ssl": false,
+      "connectionPool": {
+        "maxConnections": 10,
+        "timeout": 30000,
+        "minIdle": 2
+      }
+    },
+    "target": {
+      "type": "h2",
+      "file": "./target/test-db.h2.db",
+      "mode": "file",
+      "compression": false
+    },
+    "migration": {
+      "tables": ["*"],
+      "excludeTables": ["temp_*", "log_*", "audit_*"],
+      "batchSize": 1000,
+      "preserveData": true,
+      "dataTypeMappings": {
+        "postgresql.uuid": "h2.uuid",
+        "mysql.json": "h2.varchar(4000)"
+      },
+      "functionMappings": {
+        "gen_random_uuid()": "RANDOM_UUID()",
+        "CURRENT_TIMESTAMP": "CURRENT_TIMESTAMP",
+        "now()": "CURRENT_TIMESTAMP",
+        "true": "true",
+        "false": "false"
+      },
+      "constraints": {
+        "preserveForeignKeys": true,
+        "preserveIndexes": true,
+        "preserveTriggers": false,
+        "preserveSequences": true
+      },
+      "data": {
+        "maxRows": null,
+        "sampleData": false,
+        "samplePercentage": 10,
+        "validateData": true,
+        "anonymizeData": false,
+        "anonymizationRules": {
+          "email": "hash",
+          "phone": "random",
+          "password": "null"
+        }
+      }
+    },
+    "output": {
+      "generateReport": true,
+      "reportFile": "./migration-report.html",
+      "logLevel": "INFO",
+      "outputDir": "./output",
+      "exitOnError": false
+    }
+  } 

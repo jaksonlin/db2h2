@@ -28,6 +28,14 @@
       "postgresql.uuid": "h2.uuid",
       "mysql.json": "h2.varchar(4000)"
     },
+    "functionMappings": {
+      "gen_random_uuid()": "RANDOM_UUID()",
+      "CURRENT_TIMESTAMP": "CURRENT_TIMESTAMP",
+      "now()": "CURRENT_TIMESTAMP",
+      "UUID()": "RANDOM_UUID()",
+      "SYSDATE": "CURRENT_TIMESTAMP",
+      "GETDATE()": "CURRENT_TIMESTAMP"
+    },
     "constraints": {
       "preserveForeignKeys": true,
       "preserveIndexes": true,

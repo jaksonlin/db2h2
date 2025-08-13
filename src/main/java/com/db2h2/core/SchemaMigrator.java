@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Handles schema migration from source database to H2
@@ -24,11 +26,64 @@ public class SchemaMigrator {
     private final DatabaseConnector targetConnector;
     private final MigrationConfig config;
     
+    // Function mappings from source database to H2
+    private final Map<String, String> functionMappings;
+    
     public SchemaMigrator(DatabaseConnector sourceConnector, DatabaseConnector targetConnector, 
                          MigrationConfig config) {
         this.sourceConnector = sourceConnector;
         this.targetConnector = targetConnector;
         this.config = config;
+        this.functionMappings = initializeFunctionMappings();
+    }
+    
+    /**
+     * Initializes function mappings from source database to H2
+     */
+    private Map<String, String> initializeFunctionMappings() {
+        Map<String, String> mappings = new HashMap<>();
+        
+        // PostgreSQL to H2 function mappings
+        if ("postgresql".equalsIgnoreCase(sourceConnector.getDatabaseType())) {
+            mappings.put("gen_random_uuid()", "RANDOM_UUID()");
+            mappings.put("CURRENT_TIMESTAMP", "CURRENT_TIMESTAMP");
+            mappings.put("now()", "CURRENT_TIMESTAMP");
+            mappings.put("true", "true");
+            mappings.put("false", "false");
+        }
+        
+        // MySQL to H2 function mappings
+        if ("mysql".equalsIgnoreCase(sourceConnector.getDatabaseType())) {
+            mappings.put("CURRENT_TIMESTAMP", "CURRENT_TIMESTAMP");
+            mappings.put("NOW()", "CURRENT_TIMESTAMP");
+            mappings.put("UUID()", "RANDOM_UUID()");
+        }
+        
+        // Oracle to H2 function mappings
+        if ("oracle".equalsIgnoreCase(sourceConnector.getDatabaseType())) {
+            mappings.put("SYSDATE", "CURRENT_TIMESTAMP");
+            mappings.put("SYSTIMESTAMP", "CURRENT_TIMESTAMP");
+            mappings.put("SYS_GUID()", "RANDOM_UUID()");
+        }
+        
+        // SQL Server to H2 function mappings
+        if ("sqlserver".equalsIgnoreCase(sourceConnector.getDatabaseType()) || 
+            "microsoft".equalsIgnoreCase(sourceConnector.getDatabaseType())) {
+            mappings.put("GETDATE()", "CURRENT_TIMESTAMP");
+            mappings.put("GETUTCDATE()", "CURRENT_TIMESTAMP");
+            mappings.put("NEWID()", "RANDOM_UUID()");
+        }
+        
+        // Add custom function mappings from configuration if they exist
+        if (config.getMigration().getFunctionMappings() != null) {
+            mappings.putAll(config.getMigration().getFunctionMappings());
+            logger.debug("Added {} custom function mappings from configuration", 
+                        config.getMigration().getFunctionMappings().size());
+        }
+        
+        logger.debug("Initialized {} function mappings for database type: {}", 
+                    mappings.size(), sourceConnector.getDatabaseType());
+        return mappings;
     }
     
     /**
@@ -36,6 +91,15 @@ public class SchemaMigrator {
      */
     public void migrateSchema(List<String> tableNames) throws SQLException {
         logger.info("Starting schema migration for {} tables", tableNames.size());
+        logger.info("Using {} function mappings for database type: {}", 
+                   functionMappings.size(), sourceConnector.getDatabaseType());
+        
+        // Log function mappings for debugging
+        if (logger.isDebugEnabled()) {
+            for (Map.Entry<String, String> mapping : functionMappings.entrySet()) {
+                logger.debug("Function mapping: {} -> {}", mapping.getKey(), mapping.getValue());
+            }
+        }
         
         // Create tables in dependency order
         List<String> orderedTables = orderTablesByDependencies(tableNames);
@@ -66,6 +130,12 @@ public class SchemaMigrator {
     private void migrateTable(String tableName) throws SQLException {
         logger.debug("Migrating table: {}", tableName);
         
+        // Check if table already exists
+        if (tableExists(tableName)) {
+            logger.info("Table {} already exists, dropping and recreating", tableName);
+            dropTable(tableName);
+        }
+        
         // Get table metadata from source
         TableMetadata metadata = sourceConnector.getTableMetadata(tableName);
         
@@ -81,6 +151,99 @@ public class SchemaMigrator {
         }
     }
     
+    /**
+     * Checks if a table already exists
+     */
+    private boolean tableExists(String tableName) {
+        try {
+            String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = ?";
+            try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
+                pstmt.setString(1, tableName.toUpperCase());
+                try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not check if table exists: {}", e.getMessage());
+        }
+        return false;
+    }
+    
+    /**
+     * Drops a table if it exists
+     */
+    private void dropTable(String tableName) throws SQLException {
+        try {
+            String sql = "DROP TABLE IF EXISTS " + tableName;
+            targetConnector.executeUpdate(sql);
+            logger.debug("Dropped existing table: {}", tableName);
+        } catch (Exception e) {
+            logger.warn("Failed to drop table {}: {}", tableName, e.getMessage());
+        }
+    }
+    
+    /**
+     * Translates default values from source database to H2-compatible ones
+     */
+    public String translateDefaultValue(String defaultValue) {
+        if (defaultValue == null) {
+            return null;
+        }
+        
+        String translated = defaultValue;
+        
+        // Apply function mappings first
+        for (Map.Entry<String, String> mapping : functionMappings.entrySet()) {
+            if (translated.contains(mapping.getKey())) {
+                translated = translated.replace(mapping.getKey(), mapping.getValue());
+            }
+        }
+        
+        // Handle PostgreSQL specific patterns first (before general type casting removal)
+        if ("postgresql".equalsIgnoreCase(sourceConnector.getDatabaseType())) {
+            // Convert '{}'::jsonb to '{}' for H2
+            if (translated.contains("'{}'::jsonb")) {
+                translated = translated.replace("'{}'::jsonb", "'{}'");
+            }
+            
+            // Convert 'member'::character varying to 'member' for H2
+            if (translated.contains("::character varying")) {
+                translated = translated.replace("::character varying", "");
+            }
+            
+            // Handle numeric defaults with type casting
+            if (translated.contains("::numeric")) {
+                translated = translated.replace("::numeric", "");
+            }
+            
+            if (translated.contains("::integer")) {
+                translated = translated.replace("::integer", "");
+            }
+            
+            if (translated.contains("::text")) {
+                translated = translated.replace("::text", "");
+            }
+            
+            if (translated.contains("::boolean")) {
+                translated = translated.replace("::boolean", "");
+            }
+        }
+        
+        // Handle PostgreSQL array syntax (e.g., '{}'::text[] -> '{}')
+        if (translated.contains("[]")) {
+            translated = translated.replaceAll("\\[\\]", "");
+        }
+        
+        // Clean up any remaining type casting artifacts with a more precise regex
+        // This should only catch remaining ::type patterns that weren't handled above
+        translated = translated.replaceAll("::[a-zA-Z_][a-zA-Z0-9_]*", "");
+        
+        logger.debug("Translated default value: {} -> {}", defaultValue, translated);
+        return translated;
+    }
+
     /**
      * Generates CREATE TABLE SQL for H2
      */
@@ -104,7 +267,10 @@ public class SchemaMigrator {
             }
             
             if (column.getDefaultValue() != null) {
-                sql.append(" DEFAULT ").append(column.getDefaultValue());
+                String translatedDefault = translateDefaultValue(column.getDefaultValue());
+                if (translatedDefault != null) {
+                    sql.append(" DEFAULT ").append(translatedDefault);
+                }
             }
             
             if (column.isAutoIncrement()) {
@@ -209,6 +375,12 @@ public class SchemaMigrator {
     private void createIndexes(TableMetadata metadata) throws SQLException {
         for (IndexMetadata index : metadata.getIndexes()) {
             try {
+                // Check if index already exists
+                if (indexExists(metadata.getTableName(), index.getName())) {
+                    logger.debug("Index {} already exists on table {}, skipping", index.getName(), metadata.getTableName());
+                    continue;
+                }
+                
                 String indexSql = generateCreateIndexSql(metadata.getTableName(), index);
                 targetConnector.executeUpdate(indexSql);
                 logger.debug("Created index: {} on table: {}", index.getName(), metadata.getTableName());
@@ -217,6 +389,27 @@ public class SchemaMigrator {
                            index.getName(), metadata.getTableName(), e.getMessage());
             }
         }
+    }
+    
+    /**
+     * Checks if an index already exists on a table
+     */
+    private boolean indexExists(String tableName, String indexName) {
+        try {
+            String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME = ? AND INDEX_NAME = ?";
+            try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
+                pstmt.setString(1, tableName.toUpperCase());
+                pstmt.setString(2, indexName.toUpperCase());
+                try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not check if index exists: {}", e.getMessage());
+        }
+        return false;
     }
     
     /**
@@ -249,6 +442,12 @@ public class SchemaMigrator {
             
             for (ForeignKeyMetadata fk : metadata.getForeignKeys()) {
                 try {
+                    // Check if foreign key constraint already exists
+                    if (foreignKeyExists(tableName, fk.getName())) {
+                        logger.debug("Foreign key {} already exists on table {}, skipping", fk.getName(), tableName);
+                        continue;
+                    }
+                    
                     String fkSql = generateForeignKeySql(tableName, fk);
                     targetConnector.executeUpdate(fkSql);
                     logger.debug("Added foreign key: {} on table: {}", fk.getName(), tableName);
@@ -258,6 +457,27 @@ public class SchemaMigrator {
                 }
             }
         }
+    }
+    
+    /**
+     * Checks if a foreign key constraint already exists
+     */
+    private boolean foreignKeyExists(String tableName, String constraintName) {
+        try {
+            String sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.CONSTRAINTS WHERE TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'";
+            try (java.sql.PreparedStatement pstmt = targetConnector.getConnection().prepareStatement(sql)) {
+                pstmt.setString(1, tableName.toUpperCase());
+                pstmt.setString(2, constraintName.toUpperCase());
+                try (java.sql.ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getInt(1) > 0;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not check if foreign key exists: {}", e.getMessage());
+        }
+        return false;
     }
     
     /**
