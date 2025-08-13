@@ -2,8 +2,8 @@ package com.db2h2.core;
 
 import com.db2h2.config.MigrationConfig;
 import com.db2h2.connectors.DatabaseConnector;
-import com.db2h2.connectors.DatabaseConnector.TableMetadata;
-import com.db2h2.connectors.DatabaseConnector.ColumnMetadata;
+import com.db2h2.schema.TableMetadata;
+import com.db2h2.schema.ColumnMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

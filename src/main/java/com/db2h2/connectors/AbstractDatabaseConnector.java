@@ -1,6 +1,11 @@
 package com.db2h2.connectors;
 
 import com.db2h2.config.DatabaseConfig;
+import com.db2h2.schema.TableMetadata;
+import com.db2h2.schema.ColumnMetadata;
+import com.db2h2.schema.ForeignKeyMetadata;
+import com.db2h2.schema.IndexMetadata;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +25,10 @@ public abstract class AbstractDatabaseConnector implements DatabaseConnector {
     protected DatabaseConfig config;
     protected Connection connection;
     protected DatabaseMetaData metaData;
+
+    public Connection getConnection() {
+        return connection;
+    }
     
     public AbstractDatabaseConnector(DatabaseConfig config) {
         this.config = config;
@@ -289,94 +298,5 @@ public abstract class AbstractDatabaseConnector implements DatabaseConnector {
         }
     }
     
-    /**
-     * Inner classes for metadata
-     */
-    public static class TableMetadata {
-        private String tableName;
-        private List<ColumnMetadata> columns;
-        private List<String> primaryKeys;
-        private List<ForeignKeyMetadata> foreignKeys;
-        private List<IndexMetadata> indexes;
-        
-        // Getters and Setters
-        public String getTableName() { return tableName; }
-        public void setTableName(String tableName) { this.tableName = tableName; }
-        
-        public List<ColumnMetadata> getColumns() { return columns; }
-        public void setColumns(List<ColumnMetadata> columns) { this.columns = columns; }
-        
-        public List<String> getPrimaryKeys() { return primaryKeys; }
-        public void setPrimaryKeys(List<String> primaryKeys) { this.primaryKeys = primaryKeys; }
-        
-        public List<ForeignKeyMetadata> getForeignKeys() { return foreignKeys; }
-        public void setForeignKeys(List<ForeignKeyMetadata> foreignKeys) { this.foreignKeys = foreignKeys; }
-        
-        public List<IndexMetadata> getIndexes() { return indexes; }
-        public void setIndexes(List<IndexMetadata> indexes) { this.indexes = indexes; }
-    }
-    
-    public static class ColumnMetadata {
-        private String name;
-        private String type;
-        private int size;
-        private boolean nullable;
-        private String defaultValue;
-        private boolean autoIncrement;
-        
-        // Getters and Setters
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        
-        public String getType() { return type; }
-        public void setType(String type) { this.type = type; }
-        
-        public int getSize() { return size; }
-        public void setSize(int size) { this.size = size; }
-        
-        public boolean isNullable() { return nullable; }
-        public void setNullable(boolean nullable) { this.nullable = nullable; }
-        
-        public String getDefaultValue() { return defaultValue; }
-        public void setDefaultValue(String defaultValue) { this.defaultValue = defaultValue; }
-        
-        public boolean isAutoIncrement() { return autoIncrement; }
-        public void setAutoIncrement(boolean autoIncrement) { this.autoIncrement = autoIncrement; }
-    }
-    
-    public static class ForeignKeyMetadata {
-        private String name;
-        private String columnName;
-        private String referencedTable;
-        private String referencedColumn;
-        
-        // Getters and Setters
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        
-        public String getColumnName() { return columnName; }
-        public void setColumnName(String columnName) { this.columnName = columnName; }
-        
-        public String getReferencedTable() { return referencedTable; }
-        public void setReferencedTable(String referencedTable) { this.referencedTable = referencedTable; }
-        
-        public String getReferencedColumn() { return referencedColumn; }
-        public void setReferencedColumn(String referencedColumn) { this.referencedColumn = referencedColumn; }
-    }
-    
-    public static class IndexMetadata {
-        private String name;
-        private String columnName;
-        private boolean unique;
-        
-        // Getters and Setters
-        public String getName() { return name; }
-        public void setName(String name) { this.name = name; }
-        
-        public String getColumnName() { return columnName; }
-        public void setColumnName(String columnName) { this.columnName = columnName; }
-        
-        public boolean isUnique() { return unique; }
-        public void setUnique(boolean unique) { this.unique = unique; }
-    }
+   
 } 
