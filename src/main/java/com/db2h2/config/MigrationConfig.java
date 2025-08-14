@@ -78,6 +78,12 @@ public class MigrationConfig {
         @JsonProperty("dataTypeMappings")
         private Map<String, String> dataTypeMappings;
         
+        @JsonProperty("functionMappings")
+        private Map<String, String> functionMappings;
+        
+        @JsonProperty("maxVarcharSizeThreshold")
+        private Integer maxVarcharSizeThreshold = 1000000; // Default: 1MB
+        
         @JsonProperty("constraints")
         private ConstraintSettings constraints;
         
@@ -128,6 +134,22 @@ public class MigrationConfig {
         
         public void setDataTypeMappings(Map<String, String> dataTypeMappings) {
             this.dataTypeMappings = dataTypeMappings;
+        }
+        
+        public Map<String, String> getFunctionMappings() {
+            return functionMappings;
+        }
+        
+        public void setFunctionMappings(Map<String, String> functionMappings) {
+            this.functionMappings = functionMappings;
+        }
+        
+        public Integer getMaxVarcharSizeThreshold() {
+            return maxVarcharSizeThreshold;
+        }
+        
+        public void setMaxVarcharSizeThreshold(Integer maxVarcharSizeThreshold) {
+            this.maxVarcharSizeThreshold = maxVarcharSizeThreshold;
         }
         
         public ConstraintSettings getConstraints() {

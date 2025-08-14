@@ -35,7 +35,7 @@ mvn clean package
 
 3. Run the migration:
 ```bash
-java -jar target/db2h2-migration-1.0.0.jar --config config.json
+java -jar target/db2h2-migration-1.0.0.jar --config test-config.json
 ```
 
 ## Configuration
@@ -386,3 +386,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Docker image with pre-built databases
 - [ ] Jenkins plugin
 - [ ] GitHub Actions integration 
+
+
+## reviewing H2 content
+
+1. start h2 with server mode
+```
+java -cp target\db2h2-migration-1.0.0-jar-with-dependencies.jar org.h2.tools.Server -tcp -tcpPort 9092 -tcpAllowOthers -web -webPort 8082 -webAllowOthers
+```
+2. connect to h2 with browser
+```
+http://localhost:8082/
+```
+3. connect to h2 with jdbc
+```
+jdbc:h2:file:~/workspace/db2h2/target/test-db.h2.db
+```

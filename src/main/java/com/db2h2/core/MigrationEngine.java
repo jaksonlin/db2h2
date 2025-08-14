@@ -4,6 +4,7 @@ import com.db2h2.config.MigrationConfig;
 import com.db2h2.connectors.DatabaseConnector;
 import com.db2h2.connectors.DatabaseConnectorFactory;
 import com.db2h2.utils.ProgressTracker;
+import com.db2h2.utils.DriverLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +101,10 @@ public class MigrationEngine {
      */
     private void initializeConnections() throws SQLException {
         logger.info("Initializing database connections...");
+        
+        // Load appropriate JDBC drivers
+        DriverLoader.loadDriver(config.getSource().getType());
+        DriverLoader.loadDriver(config.getTarget().getType());
         
         // Connect to source database
         sourceConnector.connect();

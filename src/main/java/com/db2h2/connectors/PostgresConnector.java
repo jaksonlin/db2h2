@@ -1,11 +1,25 @@
 package com.db2h2.connectors;
 
 import com.db2h2.config.DatabaseConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * PostgreSQL database connector implementation
  */
 public class PostgresConnector extends AbstractDatabaseConnector {
+    
+    private static final Logger logger = LoggerFactory.getLogger(PostgresConnector.class);
+    
+    static {
+        try {
+            // Explicitly load the PostgreSQL JDBC driver
+            Class.forName("org.postgresql.Driver");
+            logger.debug("PostgreSQL JDBC driver loaded successfully");
+        } catch (ClassNotFoundException e) {
+            logger.error("Failed to load PostgreSQL JDBC driver: {}", e.getMessage());
+        }
+    }
     
     public PostgresConnector(DatabaseConfig config) {
         super(config);
