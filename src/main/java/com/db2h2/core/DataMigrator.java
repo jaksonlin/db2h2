@@ -117,35 +117,55 @@ public class DataMigrator {
         // Generate INSERT statement
         String insertSql = generateInsertSql(tableName, metadata);
         
-        // Prepare statement
+        // Prepare statement with transaction management
         Connection targetConnection = getTargetConnection();
-        PreparedStatement pstmt = targetConnection.prepareStatement(insertSql);
+        boolean originalAutoCommit = targetConnection.getAutoCommit();
         
-        int rowCount = 0;
-        do {
-            // Set parameter values
-            setParameters(pstmt, metadata, rs);
+        try {
+            targetConnection.setAutoCommit(false);
             
-            // Add to batch
-            pstmt.addBatch();
-            rowCount++;
-            
-        } while (rs.next());
-        
-        // Execute batch
-        int[] results = pstmt.executeBatch();
-        pstmt.close();
-        
-        // Count successful inserts
-        int successfulInserts = 0;
-        for (int result : results) {
-            if (result >= 0) {
-                successfulInserts++;
+            try (PreparedStatement pstmt = targetConnection.prepareStatement(insertSql)) {
+                int rowCount = 0;
+                do {
+                    // Set parameter values
+                    setParameters(pstmt, metadata, rs);
+                    
+                    // Add to batch
+                    pstmt.addBatch();
+                    rowCount++;
+                    
+                } while (rs.next());
+                
+                // Execute batch
+                int[] results = pstmt.executeBatch();
+                targetConnection.commit();
+                
+                // Count successful inserts
+                int successfulInserts = 0;
+                for (int result : results) {
+                    if (result >= 0) {
+                        successfulInserts++;
+                    }
+                }
+                
+                logger.debug("Inserted {} rows into table {}", successfulInserts, tableName);
+                return successfulInserts;
+            }
+        } catch (SQLException e) {
+            logger.error("Error inserting batch data for table {}: {}", tableName, e.getMessage());
+            try {
+                targetConnection.rollback();
+            } catch (SQLException rollbackEx) {
+                logger.error("Error rolling back transaction: {}", rollbackEx.getMessage());
+            }
+            throw e;
+        } finally {
+            try {
+                targetConnection.setAutoCommit(originalAutoCommit);
+            } catch (SQLException e) {
+                logger.warn("Error restoring auto-commit mode: {}", e.getMessage());
             }
         }
-        
-        logger.debug("Inserted {} rows into table {}", successfulInserts, tableName);
-        return successfulInserts;
     }
     
     /**
@@ -357,8 +377,9 @@ public class DataMigrator {
      * Gets the target database connection
      */
     private Connection getTargetConnection() throws SQLException {
-        // This is a simplified approach - in a real implementation, you might want to use a connection pool
-        return targetConnector.isConnected() ? 
-            ((com.db2h2.connectors.AbstractDatabaseConnector) targetConnector).getConnection() : null;
+        if (!targetConnector.isConnected()) {
+            targetConnector.connect();
+        }
+        return targetConnector.getConnection();
     }
 } 

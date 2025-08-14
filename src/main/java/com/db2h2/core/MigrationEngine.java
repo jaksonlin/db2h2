@@ -1,6 +1,7 @@
 package com.db2h2.core;
 
 import com.db2h2.config.MigrationConfig;
+import com.db2h2.config.ConfigValidator;
 import com.db2h2.connectors.DatabaseConnector;
 import com.db2h2.connectors.DatabaseConnectorFactory;
 import com.db2h2.utils.ProgressTracker;
@@ -27,6 +28,18 @@ public class MigrationEngine {
     private final ProgressTracker progressTracker;
     
     public MigrationEngine(MigrationConfig config) {
+        // Validate configuration first
+        ConfigValidator.ValidationResult validation = ConfigValidator.validate(config);
+        if (!validation.isValid()) {
+            throw new IllegalArgumentException("Configuration validation failed: " + 
+                String.join(", ", validation.getErrors()));
+        }
+        
+        // Log warnings if any
+        for (String warning : validation.getWarnings()) {
+            logger.warn("Configuration warning: {}", warning);
+        }
+        
         this.config = config;
         this.sourceConnector = DatabaseConnectorFactory.createConnector(config.getSource());
         this.targetConnector = DatabaseConnectorFactory.createConnector(config.getTarget());
@@ -53,6 +66,9 @@ public class MigrationEngine {
             
             // Phase 3: Filter tables based on configuration
             List<String> filteredTables = filterTables(tableNames);
+            
+            // Initialize progress tracking
+            progressTracker.setTotalTables(filteredTables.size());
             
             // Phase 4: Migrate schema
             schemaMigrator.migrateSchema(filteredTables);

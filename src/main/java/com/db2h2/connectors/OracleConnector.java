@@ -1,11 +1,25 @@
 package com.db2h2.connectors;
 
 import com.db2h2.config.DatabaseConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Oracle database connector implementation
  */
 public class OracleConnector extends AbstractDatabaseConnector {
+    
+    private static final Logger logger = LoggerFactory.getLogger(OracleConnector.class);
+    
+    static {
+        try {
+            // Explicitly load the Oracle JDBC driver
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            logger.debug("Oracle JDBC driver loaded successfully");
+        } catch (ClassNotFoundException e) {
+            logger.error("Failed to load Oracle JDBC driver: {}", e.getMessage());
+        }
+    }
     
     public OracleConnector(DatabaseConfig config) {
         super(config);

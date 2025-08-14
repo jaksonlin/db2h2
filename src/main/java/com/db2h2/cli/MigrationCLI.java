@@ -35,8 +35,22 @@ public class MigrationCLI {
             // Load configuration
             MigrationConfig config = loadConfiguration(cmd);
             
-            // Validate configuration
-            config.validate();
+            // Enhanced configuration validation
+            com.db2h2.config.ConfigValidator.ValidationResult validation = 
+                com.db2h2.config.ConfigValidator.validate(config);
+            
+            if (!validation.isValid()) {
+                logger.error("Configuration validation failed:");
+                for (String error : validation.getErrors()) {
+                    logger.error("  - {}", error);
+                }
+                System.exit(1);
+            }
+            
+            // Log warnings
+            for (String warning : validation.getWarnings()) {
+                logger.warn("Configuration warning: {}", warning);
+            }
             
             // Execute migration
             MigrationEngine engine = new MigrationEngine(config);
