@@ -22,29 +22,51 @@ public class ConfigValidator {
         
         // Basic validation
         validateBasicConfig(config, result);
+        if (result.hasErrors()) {
+            logErrors(result);
+            return result;
+        }
         
         // Source database validation
         validateSourceDatabase(config.getSource(), result);
+        if (result.hasErrors()) {
+            logErrors(result);
+            return result;
+        }
         
         // Target database validation
         validateTargetDatabase(config.getTarget(), result);
+        if (result.hasErrors()) {
+            logErrors(result);
+            return result;
+        }
         
         // Migration settings validation
         validateMigrationSettings(config.getMigration(), result);
+        if (result.hasErrors()) {
+            logErrors(result);
+            return result;
+        }
         
         // Cross-validation
         validateCrossReferences(config, result);
         
         if (result.hasErrors()) {
-            logger.error("Configuration validation failed with {} errors", result.getErrors().size());
-            for (String error : result.getErrors()) {
-                logger.error("  - {}", error);
-            }
+            logErrors(result);
         } else {
             logger.info("Configuration validation passed");
         }
         
         return result;
+    }
+
+    private static void logErrors(ValidationResult result) {
+        if (result.hasErrors()) {
+            logger.error("Configuration validation failed with {} errors", result.getErrors().size());
+            for (String error : result.getErrors()) {
+                logger.error("  - {}", error);
+            }
+        }
     }
     
     /**

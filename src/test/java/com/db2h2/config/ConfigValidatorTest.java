@@ -1,9 +1,9 @@
 package com.db2h2.config;
 
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.Before;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
 /**
  * Tests for configuration validation
@@ -12,21 +12,21 @@ public class ConfigValidatorTest {
     
     private MigrationConfig validConfig;
     
-    @BeforeEach
-    void setUp() {
+    @Before
+    public void setUp() {
         validConfig = createValidConfig();
     }
     
     @Test
-    void testValidConfiguration() {
+    public void testValidConfiguration() {
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
         
-        assertTrue(result.isValid(), "Valid configuration should pass validation");
-        assertFalse(result.hasErrors(), "Should have no errors");
+        assertTrue("Valid configuration should pass validation", result.isValid());
+        assertFalse("Should have no errors", result.hasErrors());
     }
     
     @Test
-    void testNullConfiguration() {
+    public void testNullConfiguration() {
         ConfigValidator.ValidationResult result = ConfigValidator.validate(null);
         
         assertFalse(result.isValid());
@@ -35,7 +35,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testMissingSourceDatabase() {
+    public void testMissingSourceDatabase() {
         validConfig.setSource(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -45,7 +45,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testMissingTargetDatabase() {
+    public void testMissingTargetDatabase() {
         validConfig.setTarget(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -55,18 +55,24 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testInvalidSourceDatabaseType() {
+    public void testInvalidSourceDatabaseType() {
         validConfig.getSource().setType("unsupported_db");
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
         
         assertFalse(result.isValid());
-        assertTrue(result.getErrors().stream()
-            .anyMatch(error -> error.contains("Unsupported source database type")));
+        boolean hasError = false;
+        for (String error : result.getErrors()) {
+            if (error.contains("Unsupported source database type")) {
+                hasError = true;
+                break;
+            }
+        }
+        assertTrue(hasError);
     }
     
     @Test
-    void testMissingSourceHost() {
+    public void testMissingSourceHost() {
         validConfig.getSource().setHost(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -76,7 +82,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testMissingSourceDatabase() {
+    public void testMissingSourceDatabaseName() {
         validConfig.getSource().setDatabase(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -86,7 +92,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testMissingSourceUsername() {
+    public void testMissingSourceUsername() {
         validConfig.getSource().setUsername(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -96,7 +102,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testInvalidSourcePort() {
+    public void testInvalidSourcePort() {
         validConfig.getSource().setPort(70000); // Invalid port
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -106,7 +112,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testNonH2TargetDatabase() {
+    public void testNonH2TargetDatabase() {
         validConfig.getTarget().setType("mysql");
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -116,7 +122,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testMissingH2FilePath() {
+    public void testMissingH2FilePath() {
         validConfig.getTarget().setFile(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -126,7 +132,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testInvalidH2Mode() {
+    public void testInvalidH2Mode() {
         validConfig.getTarget().setMode("invalid_mode");
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -136,7 +142,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testInvalidBatchSize() {
+    public void testInvalidBatchSize() {
         validConfig.getMigration().setBatchSize(-1);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -146,7 +152,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testInvalidMaxRows() {
+    public void testInvalidMaxRows() {
         validConfig.getMigration().getData().setMaxRows(-1);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -156,7 +162,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testInvalidSamplePercentage() {
+    public void testInvalidSamplePercentage() {
         validConfig.getMigration().getData().setSamplePercentage(150); // > 100
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
@@ -166,7 +172,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testSameSourceAndTargetH2File() {
+    public void testSameSourceAndTargetH2File() {
         // Set both source and target to H2 with same file
         validConfig.getSource().setType("h2");
         validConfig.getSource().setFile("/tmp/test.h2.db");
@@ -179,7 +185,7 @@ public class ConfigValidatorTest {
     }
     
     @Test
-    void testWarningForSamplingAndMaxRows() {
+    public void testWarningForSamplingAndMaxRows() {
         validConfig.getMigration().getData().setSampleData(true);
         validConfig.getMigration().getData().setMaxRows(1000);
         
@@ -187,56 +193,62 @@ public class ConfigValidatorTest {
         
         assertTrue(result.isValid()); // Should still be valid
         assertTrue(result.hasWarnings());
-        assertTrue(result.getWarnings().stream()
-            .anyMatch(warning -> warning.contains("Both data sampling and max rows limit are configured")));
+        boolean hasWarning = false;
+        for (String warning : result.getWarnings()) {
+            if (warning.contains("Both data sampling and max rows limit are configured")) {
+                hasWarning = true;
+                break;
+            }
+        }
+        assertTrue(hasWarning);
     }
     
     @Test
-    void testPostgreSQLDefaultPort() {
+    public void testPostgreSQLDefaultPort() {
         validConfig.getSource().setType("postgresql");
         validConfig.getSource().setPort(null); // No port specified
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
         
         assertTrue(result.isValid());
-        assertEquals(5432, validConfig.getSource().getPort()); // Should be set to default
+        assertEquals(5432, (int) validConfig.getSource().getPort()); // Should be set to default
     }
     
     @Test
-    void testMySQLDefaultPort() {
+    public void testMySQLDefaultPort() {
         validConfig.getSource().setType("mysql");
         validConfig.getSource().setPort(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
         
         assertTrue(result.isValid());
-        assertEquals(3306, validConfig.getSource().getPort());
+        assertEquals(3306, (int) validConfig.getSource().getPort());
     }
     
     @Test
-    void testOracleDefaultPort() {
+    public void testOracleDefaultPort() {
         validConfig.getSource().setType("oracle");
         validConfig.getSource().setPort(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
         
         assertTrue(result.isValid());
-        assertEquals(1521, validConfig.getSource().getPort());
+        assertEquals(1521, (int) validConfig.getSource().getPort());
     }
     
     @Test
-    void testSqlServerDefaultPort() {
+    public void testSqlServerDefaultPort() {
         validConfig.getSource().setType("sqlserver");
         validConfig.getSource().setPort(null);
         
         ConfigValidator.ValidationResult result = ConfigValidator.validate(validConfig);
         
         assertTrue(result.isValid());
-        assertEquals(1433, validConfig.getSource().getPort());
+        assertEquals(1433, (int) validConfig.getSource().getPort());
     }
     
     @Test
-    void testAnonymizationWarning() {
+    public void testAnonymizationWarning() {
         validConfig.getMigration().getData().setAnonymizeData(true);
         validConfig.getMigration().getData().setAnonymizationRules(null);
         
@@ -244,8 +256,14 @@ public class ConfigValidatorTest {
         
         assertTrue(result.isValid());
         assertTrue(result.hasWarnings());
-        assertTrue(result.getWarnings().stream()
-            .anyMatch(warning -> warning.contains("Data anonymization is enabled but no anonymization rules are defined")));
+        boolean hasWarning = false;
+        for (String warning : result.getWarnings()) {
+            if (warning.contains("Data anonymization is enabled but no anonymization rules are defined")) {
+                hasWarning = true;
+                break;
+            }
+        }
+        assertTrue(hasWarning);
     }
     
     private MigrationConfig createValidConfig() {
