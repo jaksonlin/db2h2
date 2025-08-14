@@ -98,6 +98,39 @@ java -jar db2h2.jar \
 - **MySQL**: Complete schema and data migration
 - **Oracle**: Enterprise database migration support
 - **SQL Server**: Microsoft SQL Server compatibility
+
+## Advanced Features
+
+### Auto-Increment Sequence Handling
+
+When migrating databases with auto-increment/sequence columns, you can preserve the exact data values by temporarily disabling auto-increment during migration:
+
+```json
+{
+  "migration": {
+    "constraints": {
+      "disableAutoIncrementDuringMigration": true
+    }
+  }
+}
+```
+
+**How it works:**
+1. **Schema Creation**: Tables are created without `AUTO_INCREMENT` constraints
+2. **Data Migration**: Data is inserted with original values preserved
+3. **Post-Migration**: Auto-increment is re-enabled for future inserts
+
+**Benefits:**
+- Maintains exact data integrity during migration
+- Preserves referential relationships
+- Allows for precise data validation
+- Useful for production data snapshots
+
+**Use Cases:**
+- Production database cloning for testing
+- Data migration with strict value requirements
+- Referential integrity preservation
+- Audit trail maintenance
 - **H2**: Can also migrate from H2 to H2
 
 ### Target Database

@@ -194,6 +194,17 @@ public class MigrationConfig {
         public void setPreserveSequences(Boolean preserveSequences) {
             this.preserveSequences = preserveSequences;
         }
+        
+        @JsonProperty("disableAutoIncrementDuringMigration")
+        private Boolean disableAutoIncrementDuringMigration = false;
+        
+        public Boolean getDisableAutoIncrementDuringMigration() {
+            return disableAutoIncrementDuringMigration;
+        }
+        
+        public void setDisableAutoIncrementDuringMigration(Boolean disableAutoIncrementDuringMigration) {
+            this.disableAutoIncrementDuringMigration = disableAutoIncrementDuringMigration;
+        }
     }
     
     /**

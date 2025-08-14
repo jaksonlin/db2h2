@@ -32,7 +32,8 @@
       "preserveForeignKeys": true,
       "preserveIndexes": true,
       "preserveTriggers": false,
-      "preserveSequences": true
+      "preserveSequences": true,
+      "disableAutoIncrementDuringMigration": false
     },
     "data": {
       "maxRows": null,

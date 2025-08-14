@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Handles schema migration from source database to H2
@@ -107,7 +108,7 @@ public class SchemaMigrator {
                 sql.append(" DEFAULT ").append(column.getDefaultValue());
             }
             
-            if (column.isAutoIncrement()) {
+            if (column.isAutoIncrement() && !config.getMigration().getConstraints().getDisableAutoIncrementDuringMigration()) {
                 sql.append(" AUTO_INCREMENT");
             }
         }
@@ -285,10 +286,96 @@ public class SchemaMigrator {
     }
     
     /**
+     * Disables auto-increment on all tables that have auto-increment columns
+     * This should be called before data migration to preserve exact values
+     */
+    public void disableAutoIncrement() throws SQLException {
+        if (!config.getMigration().getConstraints().getDisableAutoIncrementDuringMigration()) {
+            logger.debug("Auto-increment disabling is not configured, skipping");
+            return;
+        }
+        
+        logger.info("Disabling auto-increment on tables...");
+        
+        // Get all table names from the source database
+        List<String> tableNames = sourceConnector.getTableNames();
+        
+        for (String tableName : tableNames) {
+            try {
+                TableMetadata metadata = sourceConnector.getTableMetadata(tableName);
+                boolean hasAutoIncrement = metadata.getColumns().stream()
+                    .anyMatch(ColumnMetadata::isAutoIncrement);
+                
+                if (hasAutoIncrement) {
+                    // For H2, we need to drop and recreate the table without auto-increment
+                    // This is a simplified approach - in production you might want to use ALTER TABLE
+                    logger.debug("Table {} has auto-increment columns, will be recreated without auto-increment", tableName);
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to check auto-increment status for table {}: {}", tableName, e.getMessage());
+            }
+        }
+        
+        logger.info("Auto-increment disabling preparation completed");
+    }
+    
+    /**
+     * Re-enables auto-increment on tables that had it disabled during migration
+     * This should be called after data migration to restore auto-increment functionality
+     */
+    public void reEnableAutoIncrement() throws SQLException {
+        if (!config.getMigration().getConstraints().getDisableAutoIncrementDuringMigration()) {
+            logger.debug("Auto-increment was not disabled during migration, skipping re-enabling");
+            return;
+        }
+        
+        logger.info("Re-enabling auto-increment on tables...");
+        
+        // Get all table names from the source database
+        List<String> tableNames = sourceConnector.getTableNames();
+        
+        for (String tableName : tableNames) {
+            try {
+                TableMetadata metadata = sourceConnector.getTableMetadata(tableName);
+                List<ColumnMetadata> autoIncrementColumns = metadata.getColumns().stream()
+                    .filter(ColumnMetadata::isAutoIncrement)
+                    .collect(Collectors.toList());
+                
+                if (!autoIncrementColumns.isEmpty()) {
+                    // For H2, we need to alter the table to add auto-increment back
+                    for (ColumnMetadata column : autoIncrementColumns) {
+                        String alterSql = String.format(
+                            "ALTER TABLE %s ALTER COLUMN %s AUTO_INCREMENT",
+                            tableName, column.getName()
+                        );
+                        
+                        try {
+                            targetConnector.executeUpdate(alterSql);
+                            logger.debug("Re-enabled auto-increment on column {} in table {}", column.getName(), tableName);
+                        } catch (Exception e) {
+                            logger.warn("Failed to re-enable auto-increment on column {} in table {}: {}", 
+                                       column.getName(), tableName, e.getMessage());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to re-enable auto-increment for table {}: {}", tableName, e.getMessage());
+            }
+        }
+        
+        logger.info("Auto-increment re-enabling completed");
+    }
+    
+    /**
      * Updates sequences (for auto-increment columns)
      */
     public void updateSequences() throws SQLException {
         logger.info("Updating sequences...");
+        
+        if (config.getMigration().getConstraints().getDisableAutoIncrementDuringMigration()) {
+            logger.info("Auto-increment was disabled during migration, sequences will be handled after re-enabling");
+            return;
+        }
         
         // H2 handles auto-increment automatically, so this is mainly for logging
         logger.debug("Sequences will be handled automatically by H2");

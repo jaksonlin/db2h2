@@ -56,6 +56,11 @@ public class MigrationEngine {
             // Phase 4: Migrate schema
             schemaMigrator.migrateSchema(filteredTables);
             
+            // Phase 4.5: Disable auto-increment if configured (before data migration)
+            if (config.getMigration().getConstraints().getDisableAutoIncrementDuringMigration()) {
+                schemaMigrator.disableAutoIncrement();
+            }
+            
             // Phase 5: Migrate data (if enabled)
             if (config.getMigration().getPreserveData()) {
                 dataMigrator.migrateData(filteredTables);
@@ -177,6 +182,11 @@ public class MigrationEngine {
      */
     private void finalizeMigration() throws SQLException {
         logger.info("Finalizing migration...");
+        
+        // Re-enable auto-increment if it was disabled during migration
+        if (config.getMigration().getConstraints().getDisableAutoIncrementDuringMigration()) {
+            schemaMigrator.reEnableAutoIncrement();
+        }
         
         // Update sequences if needed
         if (config.getMigration().getConstraints().getPreserveSequences()) {
